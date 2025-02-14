@@ -22,7 +22,7 @@ type Block struct {
 
 // Generate hash for a block
 func CalculateBlockHash(block Block) string {
-	record := fmt.Sprintf("%d%s%s%d%s%x",
+	record := fmt.Sprintf("%d%s%s%d%s%d",
 		block.Index,
 		block.Timestamp,
 		block.PrevHash,

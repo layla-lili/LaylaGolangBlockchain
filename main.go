@@ -6,15 +6,15 @@ import (
 
 	// "sync"
 
-	"github.com/libp2p/go-libp2p/core/host"
+	// "github.com/libp2p/go-libp2p/core/host"
 )
 
 // Global variable for wallet
 
 var Blockchain []Block
-var pendingTransactions []Transaction
-var p2pHost host.Host
-var blockchainState *BlockchainState
+// var pendingTransactions []Transaction
+// var p2pHost host.Host
+// var blockchainState *BlockchainState
 
 // var blockchainMutex sync.Mutex
 // var transactionMutex sync.Mutex

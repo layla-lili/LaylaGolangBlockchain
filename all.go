@@ -1,7 +1,7 @@
-// // This file is auto-generated. Do not edit directly.
-// // Last updated: 2025-02-14 21:42:36
+// This file is auto-generated. Do not edit directly.
+// Last updated: 2025-02-15 00:00:25
 
- package main
+package main
 
 // import (
 //     "bytes"
@@ -45,56 +45,67 @@
 // import (
 // 	"fmt"
 // 	"os"
+
 // 	// "sync"
 
-// 	"github.com/libp2p/go-libp2p/core/host"
+// 	// "github.com/libp2p/go-libp2p/core/host"
 // )
 
 // // Global variable for wallet
 
 // var Blockchain []Block
-// var pendingTransactions []Transaction
-// var p2pHost host.Host
-// var blockchainState *BlockchainState
+// // var pendingTransactions []Transaction
+// // var p2pHost host.Host
+// // var blockchainState *BlockchainState
+
 // // var blockchainMutex sync.Mutex
 // // var transactionMutex sync.Mutex
 
 // func main() {
 // 	// Initialize blockchain state
-// 	blockchainState = NewBlockchainState()
+// 	state := NewBlockchainState()
 
 // 	// Create and add genesis block
 // 	genesisBlock := CreateGenesisBlock()
-// 	blockchainState.AddBlock(genesisBlock)
+// 	if err := state.AddBlock(genesisBlock); err != nil {
+// 		fmt.Printf("❌ Failed to add genesis block: %v\n", err)
+// 		os.Exit(1)
+// 	}
 
 // 	// Initialize wallet
-// 	var err error
-// 	blockchainState.Wallet, err = NewWallet()
+// 	wallet, err := NewWallet()
 // 	if err != nil {
 // 		fmt.Printf("❌ Failed to create wallet: %v\n", err)
 // 		os.Exit(1)
 // 	}
+// 	state.SetWallet(wallet)
 
 // 	// Initialize P2P host
-// 	blockchainState.P2PHost, err = CreateLibp2pHost()
+// 	p2pHost, err := CreateLibp2pHost()
 // 	if err != nil {
 // 		fmt.Printf("❌ Failed to create libp2p host: %v\n", err)
 // 		os.Exit(1)
 // 	}
+// 	state.SetP2PHost(p2pHost)
 
 // 	// Setup P2P discovery and stream handler
-// 	if err := SetupDiscovery(blockchainState.P2PHost); err != nil {
+// 	if err := SetupDiscovery(p2pHost); err != nil {
 // 		fmt.Printf("❌ Failed to setup discovery: %v\n", err)
 // 		os.Exit(1)
 // 	}
-// 	SetupStreamHandler(blockchainState.P2PHost)
+// 	SetupStreamHandler(p2pHost)
 
-// 	// Start API Server
+// 	// Create and start server
+// 	server := NewServer(state)
 // 	apiPort := "8080"
 // 	if len(os.Args) > 1 {
 // 		apiPort = os.Args[1]
 // 	}
-// 	startAPIServer(apiPort)
+
+// 	if err := server.Start(apiPort); err != nil {
+// 		fmt.Printf("❌ Server failed: %v\n", err)
+// 		os.Exit(1)
+// 	}
 // }
 
 // // ======================
@@ -125,7 +136,7 @@
 
 // // Generate hash for a block
 // func CalculateBlockHash(block Block) string {
-// 	record := fmt.Sprintf("%d%s%s%d%s%x",
+// 	record := fmt.Sprintf("%d%s%s%d%s%d",
 // 		block.Index,
 // 		block.Timestamp,
 // 		block.PrevHash,
@@ -412,6 +423,7 @@
 // 	return baseReward + totalFees
 // }
 
+
 // func ValidateTransaction(tx Transaction, publicKey []byte) bool {
 // 	if tx.Amount <= 0 {
 // 		return false
@@ -437,6 +449,8 @@
 // // ======================
 
 // package main
+
+
 
 // const (
 // 	BlockProtocol = "/block/1.0.0"
@@ -687,26 +701,26 @@
 // 	return ecdsa.Verify(&pubKey, txHash[:], r, s)
 // }
 
-// func validateTransaction(tx Transaction, wallet *Wallet) bool {
-// 	// Check if the sender has enough funds by validating against the UTXO set
-// 	for _, utxo := range wallet.UTXOs {
-// 		if utxo.TxID == tx.TxID && utxo.Amount >= tx.Amount {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }
+// // func validateTransaction(tx Transaction, wallet *Wallet) bool {
+// // 	// Check if the sender has enough funds by validating against the UTXO set
+// // 	for _, utxo := range wallet.UTXOs {
+// // 		if utxo.TxID == tx.TxID && utxo.Amount >= tx.Amount {
+// // 			return true
+// // 		}
+// // 	}
+// // 	return false
+// // }
 
-// func removeSpentTransactions(tx Transaction) {
-// 	// Loop over pending transactions and remove spent ones
-// 	for i, t := range pendingTransactions {
-// 		if t.TxID == tx.TxID {
-// 			// Remove from pending transactions
-// 			pendingTransactions = append(pendingTransactions[:i], pendingTransactions[i+1:]...)
-// 			break
-// 		}
-// 	}
-// }
+// // func removeSpentTransactions(tx Transaction) {
+// // 	// Loop over pending transactions and remove spent ones
+// // 	for i, t := range pendingTransactions {
+// // 		if t.TxID == tx.TxID {
+// // 			// Remove from pending transactions
+// // 			pendingTransactions = append(pendingTransactions[:i], pendingTransactions[i+1:]...)
+// // 			break
+// // 		}
+// // 	}
+// // }
 
 // // ======================
 // // p2p.go
@@ -902,79 +916,116 @@
 // 	"github.com/gorilla/mux"
 // )
 
-// var mempool = Mempool{}
-
-
-// // Get full blockchain
-// func getBlockchain(w http.ResponseWriter, r *http.Request) {
-// 	json.NewEncoder(w).Encode(Blockchain)
+// type Server struct {
+// 	state *BlockchainState
 // }
 
-// // Create a new transaction
-// func createTransaction(w http.ResponseWriter, r *http.Request) {
-// 	myWallet, err := NewWallet()
-// 	if err != nil {
-// 		http.Error(w, "Failed to create wallet", http.StatusInternalServerError)
+// func NewServer(state *BlockchainState) *Server {
+// 	return &Server{state: state}
+// }
+
+// // GET /chain - Get full blockchain
+// func (s *Server) getBlockchain(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
+// 	if err := json.NewEncoder(w).Encode(s.state.GetChain()); err != nil {
+// 		http.Error(w, "Failed to encode blockchain", http.StatusInternalServerError)
 // 		return
 // 	}
+// }
+
+// // POST /transaction - Create a new transaction
+// func (s *Server) createTransaction(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
+
 // 	var tx Transaction
-// 	_ = json.NewDecoder(r.Body).Decode(&tx)
-// 	tx.TxID = CalculateTxID(tx)
-
-// 	// Assume wallet is passed or accessible to the function
-// 	if !validateTransaction(tx, myWallet) {
-// 		http.Error(w, "Invalid transaction: Not enough funds", http.StatusBadRequest)
+// 	if err := json.NewDecoder(r.Body).Decode(&tx); err != nil {
+// 		http.Error(w, "Invalid transaction data", http.StatusBadRequest)
 // 		return
 // 	}
 
-// 	pendingTransactions = append(pendingTransactions, tx)
+// 	// Generate TxID if not present
+// 	if tx.TxID == "" {
+// 		tx.TxID = CalculateTxID(tx)
+// 	}
+
+// 	// Validate and sign transaction using state wallet
+// 	if err := s.state.GetWallet().SignTransaction(&tx); err != nil {
+// 		http.Error(w, fmt.Sprintf("Failed to sign transaction: %v", err), http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	if err := s.state.AddTransaction(tx); err != nil {
+// 		http.Error(w, err.Error(), http.StatusBadRequest)
+// 		return
+// 	}
+
 // 	w.WriteHeader(http.StatusCreated)
 // 	json.NewEncoder(w).Encode(tx)
 // }
 
+// // GET /mine - Mine a new block
+// func (s *Server) mineBlock(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
 
-// // Mine a new block
-// func mineBlock(w http.ResponseWriter, r *http.Request) {
-// 	transactions := mempool.GetTransactions()
+// 	transactions := s.state.GetPendingTransactions()
 // 	if len(transactions) == 0 {
 // 		http.Error(w, "No transactions to mine", http.StatusBadRequest)
 // 		return
 // 	}
 
-// 	newBlock := GenerateBlock(Blockchain[len(Blockchain)-1], transactions)
-// 	if ValidateProofOfWork(newBlock) {
-// 		Blockchain = append(Blockchain, newBlock)
-// 		mempool.RemoveTransactions(transactions)
-// 		BroadcastBlockchain(p2pHost, Blockchain)
+// 	lastBlock := s.state.GetLastBlock()
+// 	newBlock := GenerateBlock(lastBlock, transactions)
+
+// 	if err := s.state.AddBlock(newBlock); err != nil {
+// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+// 		return
 // 	}
+
+// 	// Broadcast new block to peers
+// 	BroadcastBlockchain(s.state.GetP2PHost(), s.state.GetChain())
 
 // 	json.NewEncoder(w).Encode(newBlock)
 // }
 
+// // GET /peers - Get connected peers
+// func (s *Server) getPeers(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Content-Type", "application/json")
 
-
-// // Get connected peers should use libp2p now
-// func getPeers(w http.ResponseWriter, r *http.Request) {
-// 	peers := p2pHost.Network().Peers()
+// 	peers := s.state.GetP2PHost().Network().Peers()
 // 	peerList := make([]string, 0, len(peers))
 // 	for _, peer := range peers {
 // 		peerList = append(peerList, peer.String())
 // 	}
-// 	json.NewEncoder(w).Encode(peerList)
+
+// 	if err := json.NewEncoder(w).Encode(peerList); err != nil {
+// 		http.Error(w, "Failed to encode peer list", http.StatusInternalServerError)
+// 		return
+// 	}
 // }
 
-// // Start HTTP API Server
-// func startAPIServer(port string) {
+// // Start starts the HTTP API server
+// func (s *Server) Start(port string) error {
 // 	router := mux.NewRouter()
-// 	router.HandleFunc("/chain", getBlockchain).Methods("GET")
-// 	// router.HandleFunc("/transactions", createTransaction).Methods("POST")
-// 	router.HandleFunc("/transaction", createTransaction).Methods("POST")
 
-// 	router.HandleFunc("/mine", mineBlock).Methods("GET")
-// 	router.HandleFunc("/peers", getPeers).Methods("GET")
+// 	// Register routes
+// 	router.HandleFunc("/chain", s.getBlockchain).Methods("GET")
+// 	router.HandleFunc("/transaction", s.createTransaction).Methods("POST")
+// 	router.HandleFunc("/mine", s.mineBlock).Methods("GET")
+// 	router.HandleFunc("/peers", s.getPeers).Methods("GET")
 
-// 	fmt.Println("API Server running on port", port)
-// 	http.ListenAndServe(":"+port, router)
+// 	// Add middleware
+// 	router.Use(loggingMiddleware)
+
+// 	fmt.Printf("🚀 API Server running on port %s\n", port)
+// 	return http.ListenAndServe(":"+port, router)
+// }
+
+// // Middleware for logging requests
+// func loggingMiddleware(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		fmt.Printf("📨 %s %s\n", r.Method, r.RequestURI)
+// 		next.ServeHTTP(w, r)
+// 	})
 // }
 
 // // ======================

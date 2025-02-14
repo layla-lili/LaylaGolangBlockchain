@@ -64,23 +64,23 @@ func VerifySignature(tx *Transaction, signature string, pubKey ecdsa.PublicKey) 
 	return ecdsa.Verify(&pubKey, txHash[:], r, s)
 }
 
-func validateTransaction(tx Transaction, wallet *Wallet) bool {
-	// Check if the sender has enough funds by validating against the UTXO set
-	for _, utxo := range wallet.UTXOs {
-		if utxo.TxID == tx.TxID && utxo.Amount >= tx.Amount {
-			return true
-		}
-	}
-	return false
-}
+// func validateTransaction(tx Transaction, wallet *Wallet) bool {
+// 	// Check if the sender has enough funds by validating against the UTXO set
+// 	for _, utxo := range wallet.UTXOs {
+// 		if utxo.TxID == tx.TxID && utxo.Amount >= tx.Amount {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
-func removeSpentTransactions(tx Transaction) {
-	// Loop over pending transactions and remove spent ones
-	for i, t := range pendingTransactions {
-		if t.TxID == tx.TxID {
-			// Remove from pending transactions
-			pendingTransactions = append(pendingTransactions[:i], pendingTransactions[i+1:]...)
-			break
-		}
-	}
-}
+// func removeSpentTransactions(tx Transaction) {
+// 	// Loop over pending transactions and remove spent ones
+// 	for i, t := range pendingTransactions {
+// 		if t.TxID == tx.TxID {
+// 			// Remove from pending transactions
+// 			pendingTransactions = append(pendingTransactions[:i], pendingTransactions[i+1:]...)
+// 			break
+// 		}
+// 	}
+// }

@@ -51,6 +51,7 @@ func CalculateBlockReward(block Block) float64 {
 	return baseReward + totalFees
 }
 
+
 func ValidateTransaction(tx Transaction, publicKey []byte) bool {
 	if tx.Amount <= 0 {
 		return false
