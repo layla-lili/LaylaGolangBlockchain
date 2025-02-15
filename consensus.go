@@ -2,6 +2,10 @@ package main
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/sha256"
+	"fmt"
 	"sync"
 )
 
@@ -42,34 +46,76 @@ func (c *Consensus) HandleChainSync(receivedChain []Block) bool {
 }
 
 func (c *Consensus) ValidateChain(chain []Block) bool {
+	if len(chain) == 0 {
+		return false
+	}
+
+	// Validate each block
 	for i := 1; i < len(chain); i++ {
-		currentBlock := chain[i]
-		previousBlock := chain[i-1]
+		block := chain[i]
+		prevBlock := chain[i-1]
 
-		if !bytes.Equal([]byte(currentBlock.PrevHash), []byte(previousBlock.Hash)) {
+		// Validate block hash and previous hash
+		if block.PrevHash != prevBlock.Hash {
+			fmt.Printf("❌ Invalid previous hash at block %d\n", block.Index)
 			return false
 		}
 
-		if !c.ValidateBlockTransactions(currentBlock) {
+		calculatedHash := CalculateBlockHash(block)
+		if calculatedHash != block.Hash {
+			fmt.Printf("❌ Invalid block hash at block %d\n", block.Index)
 			return false
+		}
+
+		// Validate block transactions
+		for _, tx := range block.Transactions {
+			if !c.ValidateTransaction(tx) {
+				fmt.Printf("❌ Invalid transaction in block %d\n", block.Index)
+				return false
+			}
 		}
 	}
-	return true
-}
 
-func (c *Consensus) ValidateBlockTransactions(block Block) bool {
-	for _, tx := range block.Transactions {
-		if !c.ValidateTransaction(tx) {
-			return false
-		}
-	}
 	return true
 }
 
 func (c *Consensus) ValidateTransaction(tx Transaction) bool {
-	wallet := c.state.GetWallet()
-	publicKeyBytes := wallet.GetPublicKeyBytes()
-	return ValidateTransaction(tx, publicKeyBytes)
+	// Reconstruct public key from bytes
+	x, y := elliptic.Unmarshal(elliptic.P256(), tx.SenderPublicKey)
+	if x == nil {
+		fmt.Printf("❌ Invalid public key format\n")
+		return false
+	}
+
+	pubKey := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	// Calculate transaction hash using the same method as signing
+	txData := fmt.Sprintf("%s%s%f%v",
+		tx.SenderAddress,
+		tx.Receiver,
+		tx.Amount,
+		tx.Timestamp.Unix())
+
+	txHash := sha256.Sum256([]byte(txData))
+
+	// Verify signature
+	if !ecdsa.VerifyASN1(pubKey, txHash[:], tx.Signature) {
+		fmt.Printf("❌ Invalid signature for transaction %s\n", tx.TxID)
+		return false
+	}
+
+	// Verify address matches public key
+	derivedAddr := GenerateAddress(tx.SenderPublicKey)
+	if derivedAddr != tx.SenderAddress {
+		fmt.Printf("❌ Address mismatch: derived=%s, tx=%s\n", derivedAddr, tx.SenderAddress)
+		return false
+	}
+
+	return true
 }
 
 func (c *Consensus) ValidateProofOfWork(block Block) bool {

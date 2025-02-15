@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -33,47 +34,38 @@ func (n *Notifee) HandlePeerFound(pi peer.AddrInfo) {
 
 	fmt.Printf("🎯 Peer Discovered: %s\n", pi.ID)
 
-	// Check if already connected
-	if n.h.Network().Connectedness(pi.ID) == network.Connected {
-		fmt.Printf("ℹ️  Already connected to peer: %s\n", pi.ID)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	if err := n.h.Connect(ctx, pi); err != nil {
+		fmt.Printf("❌ Failed to connect to peer %s: %v\n", pi.ID, err)
 		return
 	}
 
-	// Try to connect with retries
-	const maxRetries = 3
-	var lastErr error
+	fmt.Printf("🔗 Successfully connected to peer: %s\n", pi.ID)
 
-	for i := 0; i < maxRetries; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancel()
-
-		if err := n.h.Connect(ctx, pi); err != nil {
-			lastErr = err
-			fmt.Printf("❌ Connection attempt %d failed: %v\n", i+1, err)
-			time.Sleep(time.Second) // Wait before retry
-			continue
+	// Open stream with retry
+	var stream network.Stream
+	var err error
+	for i := 0; i < 3; i++ {
+		stream, err = n.h.NewStream(ctx, pi.ID, protocolID)
+		if err == nil {
+			break
 		}
-
-		fmt.Printf("🔗 Successfully connected to peer: %s\n", pi.ID)
-
-		// Try to open stream with retry
-		stream, err := n.tryOpenStream(pi.ID)
-		if err != nil {
-			fmt.Printf("⚠️ Stream setup failed: %v\n", err)
-			return
-		}
-		defer stream.Close()
-
-		// Send hello message
-		if err := n.sendHello(stream); err != nil {
-			fmt.Printf("⚠️ Failed to send hello: %v\n", err)
-			return
-		}
-
-		return // Success
+		time.Sleep(time.Second)
 	}
+	if err != nil {
+		fmt.Printf("❌ Failed to open stream after retries: %v\n", err)
+		return
+	}
+	defer stream.Close()
 
-	fmt.Printf("❌ Failed to connect after %d attempts: %v\n", maxRetries, lastErr)
+	// Send hello message
+	message := fmt.Sprintf("Hello from %s!", n.h.ID())
+	if _, err := stream.Write([]byte(message)); err != nil {
+		fmt.Printf("❌ Failed to send hello: %v\n", err)
+		return
+	}
 }
 
 // Add helper methods for stream handling
@@ -203,7 +195,17 @@ func CreateLibp2pHost(port string) (host.Host, error) {
 		return nil, fmt.Errorf("failed to create multiaddr: %w", err)
 	}
 
-	// Create libp2p host with basic options
+	// Create connection manager first
+	connManager, err := connmgr.NewConnManager(
+		100, // Lowwater
+		400, // HighWater,
+		connmgr.WithGracePeriod(time.Minute),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection manager: %w", err)
+	}
+
+	// Create libp2p host with the connection manager
 	h, err := libp2p.New(
 		libp2p.ListenAddrs(ma),
 		libp2p.Identity(priv),
@@ -211,10 +213,11 @@ func CreateLibp2pHost(port string) (host.Host, error) {
 		libp2p.DefaultMuxers,
 		libp2p.DefaultSecurity,
 		libp2p.NATPortMap(),
-		// Remove EnableAutoRelay and EnableRelay options
+		libp2p.DisableRelay(),
+		libp2p.ConnectionManager(connManager),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
+		return nil, fmt.Errorf("failed to create host: %w", err)
 	}
 
 	// Log the host's addresses

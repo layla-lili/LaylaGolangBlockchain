@@ -111,7 +111,16 @@ func GenerateAddress(publicKey []byte) string {
 }
 
 func (w *Wallet) GetPublicKeyBytes() []byte {
-	return w.PublicKey
+	if w == nil || w.PublicKey == nil {
+		return []byte{} // Return empty bytes instead of nil
+	}
+
+	pubKeyBytes := w.PublicKey
+	if pubKeyBytes == nil {
+		return []byte{} // Ensure we never return nil
+	}
+
+	return pubKeyBytes
 }
 
 func (w *Wallet) GetAddress() string {
@@ -120,27 +129,33 @@ func (w *Wallet) GetAddress() string {
 
 // Sign a transaction
 func (w *Wallet) SignTransaction(tx *Transaction) error {
-	// Set sender details
-	tx.SenderPublicKey = w.PublicKey
-	tx.SenderAddress = w.Address
+	if w == nil || w.PrivateKey == nil {
+		return fmt.Errorf("wallet or private key is nil")
+	}
 
-	// Create hash of transaction data
+	// Set sender information first
+	tx.SenderAddress = w.GetAddress()
+	tx.SenderPublicKey = w.GetPublicKeyBytes()
+
+	// Calculate transaction hash for signing
 	txData := fmt.Sprintf("%s%s%f%v",
 		tx.SenderAddress,
 		tx.Receiver,
 		tx.Amount,
-		tx.Timestamp,
-	)
-	txHash := sha256.Sum256([]byte(txData))
-	tx.TxID = hex.EncodeToString(txHash[:])
+		tx.Timestamp.Unix())
 
-	// Sign the transaction
+	txHash := sha256.Sum256([]byte(txData))
+
+	// Sign the transaction hash
 	signature, err := ecdsa.SignASN1(rand.Reader, w.PrivateKey, txHash[:])
 	if err != nil {
 		return fmt.Errorf("failed to sign transaction: %w", err)
 	}
 
+	// Set signature and TxID
 	tx.Signature = signature
+	tx.TxID = hex.EncodeToString(txHash[:])
+
 	return nil
 }
 
@@ -161,35 +176,39 @@ func SignData(privateKey *ecdsa.PrivateKey, data []byte) ([]byte, error) {
 	return ecdsa.SignASN1(rand.Reader, privateKey, hash[:])
 }
 
-// func VerifySignature(publicKey []byte, data []byte, signature []byte) bool {
-// 	// Convert public key bytes to ECDSA public key
-// 	curve := ecdh.P256()
-// 	ecdhPub, err := curve.NewPublicKey(publicKey)
-// 	if err != nil {
-// 		return false
-// 	}
+func VerifySignature(publicKeyBytes []byte, data []byte, signature []byte) bool {
+	// Improvements:
+	// 1. Takes raw bytes for all parameters
+	// 2. More flexible - can verify any data, not just transactions
+	// 3. Reconstructs public key from bytes
+	// 4. Uses ASN.1 encoded signatures
 
-// 	ecdsaPub := &ecdsa.PublicKey{
-// 		Curve: curve.Curve(),
-// 		X:     ecdhPub.X(),
-// 		Y:     ecdhPub.Y(),
-// 	}
+	// Convert public key bytes to ECDSA public key
+	x, y := elliptic.Unmarshal(elliptic.P256(), publicKeyBytes)
+	if x == nil {
+		return false
+	}
 
-// 	hash := sha256.Sum256(data)
-// 	return ecdsa.VerifyASN1(ecdsaPub, hash[:], signature)
-// }
+	publicKey := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	return ecdsa.VerifyASN1(publicKey, data, signature)
+}
 
 // Verify transaction signature
-func VerifySignature(tx *Transaction, signature string, pubKey ecdsa.PublicKey) bool {
-	txHash := sha256.Sum256([]byte(tx.TxID))
-	r := new(big.Int)
-	s := new(big.Int)
-	sigLen := len(signature) / 2
-	r.SetString(signature[:sigLen], 16)
-	s.SetString(signature[sigLen:], 16)
+// func VerifySignature(tx *Transaction, signature string, pubKey ecdsa.PublicKey) bool {
+// 	txHash := sha256.Sum256([]byte(tx.TxID))
+// 	r := new(big.Int)
+// 	s := new(big.Int)
+// 	sigLen := len(signature) / 2
+// 	r.SetString(signature[:sigLen], 16)
+// 	s.SetString(signature[sigLen:], 16)
 
-	return ecdsa.Verify(&pubKey, txHash[:], r, s)
-}
+// 	return ecdsa.Verify(&pubKey, txHash[:], r, s)
+// }
 
 // func validateTransaction(tx Transaction, wallet *Wallet) bool {
 // 	// Check if the sender has enough funds by validating against the UTXO set
