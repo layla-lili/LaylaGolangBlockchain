@@ -11,21 +11,15 @@ import (
 
 // Transaction represents a simple transaction
 type Transaction struct {
-	Sender    string  // Public Key (Address)
-	Receiver  string  // Public Key (Address)
-	Amount    float64 // Amount of currency
-	TxID      string  // Transaction ID (Hash)
-	Signature []byte
-	Timestamp time.Time
-	Fee       float64
+	TxID            string
+	SenderPublicKey []byte // Added field
+	SenderAddress   string // Added field
+	Receiver        string
+	Amount          float64
+	Timestamp       time.Time
+	Signature       []byte
+	Fee             float64
 }
-
-// type Transaction struct {
-// 	Sender    string `json:"sender"`
-// 	Receiver string `json:"receiver"`
-// 	Amount    float64 `json:"amount"`
-// 	Signature string `json:"signature"`
-// }
 
 // UTXO represents an unspent transaction output
 type UTXO struct {
@@ -36,7 +30,7 @@ type UTXO struct {
 
 // Calculate transaction hash (TxID)
 func CalculateTxID(tx Transaction) string {
-	record := tx.Sender + tx.Receiver + fmt.Sprintf("%f", tx.Amount)
+	record := tx.SenderAddress + tx.Receiver + fmt.Sprintf("%f", tx.Amount)
 	hash := sha256.Sum256([]byte(record))
 	return hex.EncodeToString(hash[:])
 }
@@ -51,23 +45,32 @@ func CalculateBlockReward(block Block) float64 {
 	return baseReward + totalFees
 }
 
-
-func ValidateTransaction(tx Transaction, publicKey []byte) bool {
+func ValidateTransaction(tx Transaction, signature []byte) bool {
+	// Verify amount
 	if tx.Amount <= 0 {
 		return false
 	}
 
-	txHash := sha256.Sum256([]byte(tx.TxID))
-	x, y := elliptic.Unmarshal(elliptic.P256(), publicKey)
+	// Reconstruct hash that was signed
+	txData := fmt.Sprintf("%s%s%f%v",
+		tx.SenderAddress,
+		tx.Receiver,
+		tx.Amount,
+		tx.Timestamp,
+	)
+	txHash := sha256.Sum256([]byte(txData))
+
+	// Convert public key bytes to ECDSA public key
+	x, y := elliptic.Unmarshal(elliptic.P256(), tx.SenderPublicKey)
 	if x == nil {
 		return false
 	}
 
-	publicKeyECDSA := &ecdsa.PublicKey{
+	publicKey := &ecdsa.PublicKey{
 		Curve: elliptic.P256(),
 		X:     x,
 		Y:     y,
 	}
 
-	return ecdsa.VerifyASN1(publicKeyECDSA, txHash[:], tx.Signature)
+	return ecdsa.VerifyASN1(publicKey, txHash[:], tx.Signature)
 }

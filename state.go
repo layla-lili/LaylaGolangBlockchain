@@ -1,8 +1,9 @@
 package main
 
 import (
-	"sync"
 	"fmt"
+	"sync"
+
 	"github.com/libp2p/go-libp2p/core/host"
 )
 
@@ -20,26 +21,55 @@ type BlockchainState struct {
 	txMutex    sync.RWMutex
 }
 
+func (bs *BlockchainState) ReplaceChain(newChain []Block) {
+	bs.chainMutex.Lock()
+	defer bs.chainMutex.Unlock()
+	bs.chain = newChain
+}
+
 // NewBlockchainState initializes a new blockchain state
 func NewBlockchainState() *BlockchainState {
-	return &BlockchainState{
+	fmt.Println("🔧 Creating new blockchain state...")
+	state := &BlockchainState{
 		chain:      make([]Block, 0),
 		pendingTxs: make([]Transaction, 0),
 		mempool:    NewMempool(),
 		consensus:  &Consensus{},
 	}
+
+	fmt.Println("✨ Blockchain state created successfully")
+	return state
 }
 
 // Chain operations
+// Fix the AddBlock method to avoid deadlock
 func (s *BlockchainState) AddBlock(block Block) error {
-	s.chainMutex.Lock()
-	defer s.chainMutex.Unlock()
+	fmt.Printf("📦 Adding block %d to chain\n", block.Index)
 
-	if err := ValidateBlock(block, s.GetLastBlock()); err != nil {
+	// Special case for genesis block
+	if len(s.chain) == 0 && block.Index == 0 {
+		s.chainMutex.Lock()
+		defer s.chainMutex.Unlock()
+		s.chain = append(s.chain, block)
+		fmt.Println("🌟 Genesis block added successfully")
+		return nil
+	}
+
+	// Normal block addition logic
+	lastBlock := s.GetLastBlock()
+	if err := ValidateBlock(block, lastBlock); err != nil {
 		return fmt.Errorf("invalid block: %w", err)
 	}
 
+	s.chainMutex.Lock()
+	defer s.chainMutex.Unlock()
+
+	if len(s.chain) > 0 && s.chain[len(s.chain)-1].Hash != lastBlock.Hash {
+		return fmt.Errorf("chain changed during validation")
+	}
+
 	s.chain = append(s.chain, block)
+	fmt.Printf("✅ Block %d added successfully\n", block.Index)
 	return nil
 }
 
@@ -89,4 +119,8 @@ func (s *BlockchainState) SetWallet(w *Wallet) {
 
 func (s *BlockchainState) GetWallet() *Wallet {
 	return s.wallet
+}
+
+func (s *BlockchainState) GetConsensus() *Consensus {
+	return NewConsensus(s)
 }

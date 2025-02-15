@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/gorilla/mux"
+	"time"
 )
 
 type Server struct {
+	// blockchain *Blockchain
 	state *BlockchainState
 }
 
@@ -18,6 +18,11 @@ func NewServer(state *BlockchainState) *Server {
 
 // GET /chain - Get full blockchain
 func (s *Server) getBlockchain(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(s.state.GetChain()); err != nil {
 		http.Error(w, "Failed to encode blockchain", http.StatusInternalServerError)
@@ -27,6 +32,11 @@ func (s *Server) getBlockchain(w http.ResponseWriter, r *http.Request) {
 
 // POST /transaction - Create a new transaction
 func (s *Server) createTransaction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
 	var tx Transaction
@@ -57,6 +67,11 @@ func (s *Server) createTransaction(w http.ResponseWriter, r *http.Request) {
 
 // GET /mine - Mine a new block
 func (s *Server) mineBlock(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
 	transactions := s.state.GetPendingTransactions()
@@ -81,6 +96,11 @@ func (s *Server) mineBlock(w http.ResponseWriter, r *http.Request) {
 
 // GET /peers - Get connected peers
 func (s *Server) getPeers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
 	peers := s.state.GetP2PHost().Network().Peers()
@@ -97,25 +117,56 @@ func (s *Server) getPeers(w http.ResponseWriter, r *http.Request) {
 
 // Start starts the HTTP API server
 func (s *Server) Start(port string) error {
-	router := mux.NewRouter()
+	fmt.Println("🔍 DEBUG: Server.Start called")
 
-	// Register routes
-	router.HandleFunc("/chain", s.getBlockchain).Methods("GET")
-	router.HandleFunc("/transaction", s.createTransaction).Methods("POST")
-	router.HandleFunc("/mine", s.mineBlock).Methods("GET")
-	router.HandleFunc("/peers", s.getPeers).Methods("GET")
+	// Setup routes with logging middleware
+	router := s.setupRoutesWithLogging()
+	fmt.Println("🔍 DEBUG: Routes setup complete")
 
-	// Add middleware
-	router.Use(loggingMiddleware)
+	addr := ":" + port
+	fmt.Printf("🔍 DEBUG: About to listen on %s\n", addr)
 
-	fmt.Printf("🚀 API Server running on port %s\n", port)
-	return http.ListenAndServe(":"+port, router)
+	// Start server in a separate goroutine
+	errChan := make(chan error)
+	go func() {
+		errChan <- http.ListenAndServe(addr, router)
+	}()
+
+	// Check for immediate errors
+	select {
+	case err := <-errChan:
+		return fmt.Errorf("server failed: %w", err)
+	case <-time.After(100 * time.Millisecond):
+		fmt.Printf("✅ Server successfully started on port %s\n", port)
+		return nil
+	}
 }
 
-// Middleware for logging requests
+// Uncomment and update the logging middleware
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("📨 %s %s\n", r.Method, r.RequestURI)
+		startTime := time.Now()
+		fmt.Printf("📨 Started %s %s\n", r.Method, r.RequestURI)
 		next.ServeHTTP(w, r)
+		fmt.Printf("✅ Completed %s %s in %v\n", r.Method, r.RequestURI, time.Since(startTime))
 	})
+}
+
+// Add a new method to setup routes with logging
+func (s *Server) setupRoutesWithLogging() http.Handler {
+	router := s.setupRoutes()
+	return loggingMiddleware(router)
+}
+
+// setupRoutes configures and returns the router with all HTTP endpoints
+func (s *Server) setupRoutes() *http.ServeMux {
+	router := http.NewServeMux()
+
+	// Define routes
+	router.HandleFunc("/chain", s.getBlockchain)
+	router.HandleFunc("/transaction", s.createTransaction)
+	router.HandleFunc("/mine", s.mineBlock)
+	router.HandleFunc("/peers", s.getPeers)
+
+	return router
 }

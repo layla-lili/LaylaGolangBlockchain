@@ -21,7 +21,7 @@ func (m *Mempool) AddTransaction(tx Transaction) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	if !ValidateTransaction(tx, []byte(tx.Sender)) {
+	if !ValidateTransaction(tx, []byte(tx.SenderAddress)) {
 		return fmt.Errorf("invalid transaction")
 	}
 
