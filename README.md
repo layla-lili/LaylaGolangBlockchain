@@ -105,6 +105,170 @@ A simple consensus mechanism is implemented via the `Consensus` struct.
 
 Helper functions like `ValidateChain`, `ValidateBlockTransactions`, and `ValidateProofOfWork` are used to enforce these rules.
 
+## CLI Interface
+
+The blockchain node comes with an interactive CLI interface for easy interaction with the network.
+
+### CLI Commands
+
+```bash
+# Start the CLI interface automatically when running a node
+go run . -http 8080 -p2p 6001
+
+💻 Starting CLI interface...
+
+🚀 Blockchain CLI
+1. View blockchain - Shows all blocks in the chain
+2. Create transaction - Create a new transaction
+3. Mine block - Mine pending transactions into a new block
+4. View peers - List all connected P2P nodes
+5. Exit
+```
+
+### Running Multiple Nodes
+
+Example of running a 4-node network:
+
+```bash
+# Terminal 1 - First Node (Bootstrap)
+go run . -http 8080 -p2p 6001
+
+# Terminal 2 - Second Node
+go run . -http 8081 -p2p 6002
+
+# Terminal 3 - Third Node
+go run . -http 8082 -p2p 6003
+
+# Terminal 4 - Fourth Node
+go run . -http 8083 -p2p 6004
+```
+
+### Testing Network Synchronization
+
+1. Create a transaction on Node 1:
+   ```bash
+   # In Node 1's CLI
+   Choose option 2 (Create transaction)
+   ```
+
+2. Mine the block on Node 1:
+   ```bash
+   # In Node 1's CLI
+   Choose option 3 (Mine block)
+   ```
+
+3. Verify synchronization on other nodes:
+   ```bash
+   # In other nodes' CLI
+   Choose option 1 (View blockchain)
+   ```
+
+## Updated Components
+
+### Connection Manager
+
+The P2P network now includes a connection manager with the following features:
+```go
+connManager, err := connmgr.NewConnManager(
+    100,    // LowWater - minimum number of connections to maintain
+    400,    // HighWater - maximum number of connections before pruning
+    connmgr.WithGracePeriod(time.Minute), // Grace period for new connections
+)
+```
+
+### Improved Transaction Validation
+
+Transaction validation now includes multiple checks:
+- Public key verification
+- Signature validation
+- Address derivation verification
+- Timestamp validation
+
+### Enhanced P2P Communication
+
+The P2P protocol now includes:
+- Automatic peer discovery using mDNS
+- Connection retry mechanism
+- Stream-based communication
+- Blockchain synchronization
+- Transaction broadcasting
+
+### State Management
+
+The `BlockchainState` struct manages:
+- Blockchain data
+- Pending transactions
+- Mempool
+- Wallet
+- P2P connections
+- Consensus rules
+
+## Network Scenarios
+
+### Adding a New Node
+```bash
+# Start a new node with unique ports
+go run . -http 8084 -p2p 6005
+
+# The node will:
+1. Generate a new wallet
+2. Create genesis block
+3. Discover peers via mDNS
+4. Sync blockchain automatically
+```
+
+### Creating Transactions Between Nodes
+1. Get recipient's address from Node 2:
+   ```bash
+   # In Node 2's CLI
+   Choose option 4 (View peers)
+   ```
+
+2. Create transaction on Node 1:
+   ```bash
+   # In Node 1's CLI
+   Choose option 2 (Create transaction)
+   Enter recipient's address
+   Enter amount
+   ```
+
+3. Mine the transaction:
+   ```bash
+   # Can be done on any node
+   Choose option 3 (Mine block)
+   ```
+
+### Handling Network Partitions
+
+The system automatically:
+- Retries failed connections
+- Maintains peer list
+- Resynchronizes when connection is restored
+- Validates and resolves chain conflicts
+
+## Common Issues and Solutions
+
+### Peer Discovery Issues
+- Ensure mDNS is not blocked by firewall
+- Check all nodes are on the same network
+- Verify port availability
+
+### Transaction Failures
+- Verify sender has sufficient balance
+- Check transaction signature
+- Ensure receiver address is valid
+
+### Mining Issues
+- Check node synchronization
+- Verify pending transactions
+- Ensure proper difficulty level
+
+## Performance Considerations
+
+- **Memory Usage**: Mempool cleanup occurs every hour
+- **Network Bandwidth**: Blockchain syncs only transfer missing blocks
+- **CPU Usage**: Mining difficulty adjusts based on network hash rate
+
 ## Evaluation
 
 ### Strengths:

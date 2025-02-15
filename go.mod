@@ -2,10 +2,7 @@ module github.com/layla-lili/blockchain-mvp
 
 go 1.23.4
 
-require (
-	github.com/gorilla/mux v1.8.1
-	github.com/libp2p/go-libp2p v0.39.1
-)
+require github.com/libp2p/go-libp2p v0.39.1
 
 require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
