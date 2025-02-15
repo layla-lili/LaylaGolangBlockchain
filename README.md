@@ -1,5 +1,78 @@
 # Blockchain Implementation in Go
 
+## Table of Contents
+- [Blockchain Implementation in Go](#blockchain-implementation-in-go)
+  - [Table of Contents](#table-of-contents)
+- [Blockchain Implementation in Go](#blockchain-implementation-in-go-1)
+  - [Code Flow Explanation](#code-flow-explanation)
+    - [1. Application Initialization (`main.go`)](#1-application-initialization-maingo)
+      - [State Initialization:](#state-initialization)
+      - [Genesis Block Creation:](#genesis-block-creation)
+      - [Wallet Initialization:](#wallet-initialization)
+      - [P2P Host Setup:](#p2p-host-setup)
+      - [Server Initialization:](#server-initialization)
+    - [2. Block Handling (`block.go` \& `block_test.go`)](#2-block-handling-blockgo--block_testgo)
+      - [Block Structure:](#block-structure)
+      - [Hash Calculation:](#hash-calculation)
+      - [Block Generation \& Mining:](#block-generation--mining)
+      - [Genesis Block:](#genesis-block)
+      - [Testing:](#testing)
+    - [3. Transaction Processing (`transaction.go`)](#3-transaction-processing-transactiongo)
+      - [Transaction Structure:](#transaction-structure)
+      - [TxID Calculation:](#txid-calculation)
+      - [Signature and Verification:](#signature-and-verification)
+    - [4. Merkle Tree Operations (`merkle.go`)](#4-merkle-tree-operations-merklego)
+      - [Integration with External Library:](#integration-with-external-library)
+      - [Merkle Tree Interface:](#merkle-tree-interface)
+      - [Merkle Root Calculation \& Verification:](#merkle-root-calculation--verification)
+    - [5. Blockchain State and Server (`server.go`)](#5-blockchain-state-and-server-servergo)
+      - [Server Object:](#server-object)
+      - [API Endpoints:](#api-endpoints)
+      - [Middleware:](#middleware)
+    - [6. P2P Communication (`p2plibp2p.go` \& `p2p.go`)](#6-p2p-communication-p2plibp2pgo--p2pgo)
+      - [Discovery \& Connection:](#discovery--connection)
+      - [Stream Handling:](#stream-handling)
+      - [Broadcasting:](#broadcasting)
+    - [7. Consensus (`consensus.go`)](#7-consensus-consensusgo)
+      - [Chain Synchronization:](#chain-synchronization)
+  - [CLI Interface](#cli-interface)
+    - [CLI Commands](#cli-commands)
+    - [Running Multiple Nodes](#running-multiple-nodes)
+    - [Testing Network Synchronization](#testing-network-synchronization)
+  - [Updated Components](#updated-components)
+    - [Connection Manager](#connection-manager)
+    - [Improved Transaction Validation](#improved-transaction-validation)
+    - [Enhanced P2P Communication](#enhanced-p2p-communication)
+    - [State Management](#state-management)
+  - [Network Scenarios](#network-scenarios)
+    - [Adding a New Node](#adding-a-new-node)
+    - [Creating Transactions Between Nodes](#creating-transactions-between-nodes)
+    - [Handling Network Partitions](#handling-network-partitions)
+  - [Common Issues and Solutions](#common-issues-and-solutions)
+    - [Peer Discovery Issues](#peer-discovery-issues)
+    - [Transaction Failures](#transaction-failures)
+    - [Mining Issues](#mining-issues)
+  - [Performance Considerations](#performance-considerations)
+  - [Evaluation](#evaluation)
+    - [Strengths:](#strengths)
+      - [Modular Structure:](#modular-structure)
+      - [State Encapsulation:](#state-encapsulation)
+      - [Integrated P2P Networking:](#integrated-p2p-networking)
+      - [Testing Coverage:](#testing-coverage)
+      - [Clear API Endpoints:](#clear-api-endpoints)
+    - [Future Improvements:](#future-improvements)
+  - [Features](#features)
+    - [Currently Implemented](#currently-implemented)
+    - [Block Features](#block-features)
+    - [Transaction Features](#transaction-features)
+    - [Network Features](#network-features)
+    - [Storage and State](#storage-and-state)
+    - [Security](#security)
+    - [Planned Future Features](#planned-future-features)
+  - [License](#license)
+
+# Blockchain Implementation in Go
+
 This repository contains a basic implementation of a blockchain using Go. The system incorporates essential blockchain components like blocks, transactions, Merkle Trees, and a P2P network. Below is a detailed explanation of the code flow, components, and functionality.
 
 ## Code Flow Explanation
@@ -296,6 +369,70 @@ The HTTP API exposes key operations (getting the chain, submitting transactions,
 - **Private Transactions**: Implement transaction privacy features like ZK-SNARKs or ring signatures.
 
 ---
+
+## Features
+
+### Currently Implemented
+- ✅ Proof of Work consensus mechanism
+- ✅ P2P networking using libp2p with mDNS discovery
+- ✅ Transaction mempool for managing pending transactions
+- ✅ Native wallet implementation with ECDSA key pairs
+- ✅ Merkle tree for transaction verification
+- ✅ RESTful API for blockchain interaction
+- ✅ Interactive CLI interface
+- ✅ Block validation with difficulty adjustment
+- ✅ Transaction signing and verification
+- ✅ Multi-node synchronization
+
+### Block Features
+- ✅ Dynamic difficulty adjustment
+- ✅ Merkle root for transaction verification
+- ✅ Block headers with timestamps
+- ✅ Previous block hash linking
+- ❌ Block size limits
+- ❌ Chain reorganization for forks
+
+### Transaction Features
+- ✅ ECDSA transaction signing
+- ✅ Transaction pool management
+- ✅ Basic transaction validation
+- ❌ Transaction batching
+- ❌ UTXO model
+- ❌ Multi-signature support
+
+### Network Features
+- ✅ Peer discovery via mDNS
+- ✅ Blockchain synchronization
+- ✅ Transaction broadcasting
+- ✅ Connection management
+- ❌ Chain history pruning
+- ❌ IPFS integration
+
+### Storage and State
+- ✅ In-memory blockchain state
+- ✅ Transaction mempool
+- ✅ Peer connection state
+- ❌ Persistent storage
+- ❌ State checkpoints
+- ❌ Immutable action logs
+
+### Security
+- ✅ ECDSA key pair generation
+- ✅ Transaction signature verification
+- ✅ Basic address generation
+- ❌ Token staking
+- ❌ Governance mechanisms
+- ❌ Advanced cryptographic schemes
+
+### Planned Future Features
+1. Chain reorganization to handle forks
+2. Block size and transaction limits
+3. Transaction batching for improved throughput
+4. Chain history pruning
+5. Persistent storage with database integration
+6. IPFS integration for distributed file storage
+7. Token staking and governance mechanisms
+8. Immutable audit logs
 
 ## License
 
